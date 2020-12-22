@@ -7,7 +7,7 @@ The project of ASC20-21 ClozeTest
 - transformers>=4.0.1
 ## Pretrained Model Prepare
 This project currently support only BERT, Albert and Roberta pretrained model.<br>
-To use one of model version supported, please pre-download from [https://huggingface.co/models]<br>
+To use one of model version supported, please pre-download from [hugging face model download page](https://huggingface.co/models)<br>
 We heighly recommend you try to use bert-large-uncased, albert-xlarge-v2 and roberta-large because they've been testd and proved worked.<br>
 ## Usage
 ### train.py
