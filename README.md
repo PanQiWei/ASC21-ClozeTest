@@ -8,5 +8,6 @@ The project of ASC20-21 ClozeTest
 ## Usage
 ### train.py
 to train a model,using the train.py file.
+
 run this on your command line like this:
-  CUDA_VISIBLE_DEVICES=0 python -m torch.distributed.launch --nproc_per_node=1 train.py --pretrained_model='albert-xlarge-v2'
+ ` CUDA_VISIBLE_DEVICES=0 python -m torch.distributed.launch --nproc_per_node=1 train.py --pretrained_model='albert-xlarge-v2'`
