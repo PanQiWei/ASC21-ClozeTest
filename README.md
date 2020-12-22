@@ -7,10 +7,16 @@ The project of ASC20-21 ClozeTest
 - transformers>=4.0.1
 ## Pretrained Model Prepare
 This project currently support only BERT, Albert and Roberta pretrained model.<br>
-To use one of model version supported, please pre-download from [hugging face model download page](https://huggingface.co/models)<br>
-We heighly recommend you try to use bert-large-uncased, albert-xlarge-v2 and roberta-large because they've been testd and proved worked.<br>
+To use one of model version supported, please pre-download from [hugging face model download page](https://huggingface.co/models).<br>
+We heighly recommend you try to use **bert-large-uncased**, **albert-xlarge-v2** and **roberta-large** because they've been testd and proved worked.<br>
 ## Usage
 ### train.py
+#### how to ran
 To train a model,using the train.py file.<br>
 Run this on your command line like this:<br>
  ` CUDA_VISIBLE_DEVICES=0 python -m torch.distributed.launch --nproc_per_node=1 train.py --pretrained_model='albert-xlarge-v2'`
+#### training tips
+Each model has its best practice super parameters in this task.<br>
+We've already tested some super parameters and they are showned below:<br>
+pretrained-model|batch size|epoch|encoder lr|decoder lr
+----------------|----------|-----|----------|----------
