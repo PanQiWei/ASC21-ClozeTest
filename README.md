@@ -5,6 +5,7 @@ The project of ASC20-21 ClozeTest
 - python>=3.6.9
 - pytorch>=1.6.0
 - transformers>=4.0.1
+- nltk
 ## Pretrained Model Prepare
 This project currently support only BERT, Albert and Roberta pretrained model.<br>
 To use one of model version supported, please pre-download from [hugging face model download page](https://huggingface.co/models).<br>
