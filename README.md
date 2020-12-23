@@ -12,8 +12,9 @@ To use one of model version supported, please pre-download from [hugging face mo
 We heighly recommend you try to use **bert-large-uncased**, **albert-xlarge-v2** and **roberta-large** because they've been testd and proved worked.<br>
 ## Usage
 ### train.py
-#### how to ran
-To train a model,using the train.py file.<br>
+#### description
+run this program to automatically preprocess and load data, train and evaluate model, and save model.
+#### how to run
 Run this on your command line like this:<br>
  ` CUDA_VISIBLE_DEVICES=0 python -m torch.distributed.launch --nproc_per_node=1 train.py --pretrained_model='albert-xlarge-v2'`
 #### training tips
@@ -25,3 +26,16 @@ bert-large-uncased|8,16,32|5|1e-5,2e-5,3e-5,5e-5|encorder lr or 1e-4
 albert-xlarge-v2|16,32,64|5|1e-5,2e-5,3e-5|encoder lr or 1e-4
 
 *note that the batch size in above table is batch_size\*accumulate_steps in program.*
+#### command line parameters
+
+### preprocess.py
+#### description
+run this program to preprocess raw data into torch tensors.
+#### how to run
+run this on your command line like this:<br>
+`python preprocess.py --pretrained_model=bert-large-uncased --ncpu=8`
+#### command line parameters
+--pretrained_model:pretrained_model_name,choose between *albert-xlarge-v2*,*bert-large-uncased*,*roberta-large*<br>
+--ncpu:number of cpu core, default 0 that the program would automatically detect the value.
+
+### eda_tools.py
