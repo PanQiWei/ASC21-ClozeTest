@@ -20,3 +20,5 @@ Each model has its best practice super parameters in this task.<br>
 We've already tested some super parameters and they are showned below:<br>
 pretrained-model|batch size|epoch|encoder lr|decoder lr
 ----------------|----------|-----|----------|----------
+bert-large-uncased|8,16,32|5|1e-5,2e-5,3e-5,5e-5|encorder lr or 1e-4
+albert-xlarge-v2|16,32,64|5|1e-5,2e-5,3e-5|encoder lr or 1e-4
