@@ -30,6 +30,7 @@ def repadding(article, article_mask):
 class PredictionHead(nn.Module):
 	def __init__(self, config, pretrained_model_name):
 		super().__init__()
+		self.config = config
 		if 'roberta' in pretrained_model_name:
 			self.model_name = 'roberta'
 		elif 'albert' in pretrained_model_name:
@@ -40,16 +41,16 @@ class PredictionHead(nn.Module):
 			raise ValueError("the model not supported yet.")
 
 		if self.model_name == 'albert':
-			self.layer_norm = nn.LayerNorm(config.embedding_size)
-			self.bias = nn.Parameter(torch.zeros(config.vocab_size))
-			self.dense = nn.Linear(config.hidden_size, config.embedding_size)
-			self.decoder = nn.Linear(config.embedding_size, config.vocab_size)
-			self.activation = ACT2FN[config.hidden_act]
+			self.layer_norm = nn.LayerNorm(self.config.embedding_size)
+			self.bias = nn.Parameter(torch.zeros(self.config.vocab_size))
+			self.dense = nn.Linear(self.config.hidden_size, self.config.embedding_size)
+			self.decoder = nn.Linear(self.config.embedding_size, self.config.vocab_size)
+			self.activation = ACT2FN[self.config.hidden_act]
 		elif self.model_name == 'roberta' or self.model_name == 'bert':
-			self.layer_norm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
-			self.bias = nn.Parameter(torch.zeros(config.vocab_size))
-			self.dense = self.dense = nn.Linear(config.hidden_size, config.hidden_size)
-			self.decoder = self.decoder = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
+			self.layer_norm = nn.LayerNorm(self.config.hidden_size, eps=self.config.layer_norm_eps)
+			self.bias = nn.Parameter(torch.zeros(self.config.vocab_size))
+			self.dense = self.dense = nn.Linear(self.config.hidden_size, self.config.hidden_size)
+			self.decoder = self.decoder = nn.Linear(self.config.hidden_size, self.config.vocab_size, bias=False)
 			self.activation = F.gelu
 
 		self.decoder.bias = self.bias
