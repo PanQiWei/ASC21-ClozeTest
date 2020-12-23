@@ -5,6 +5,7 @@ sys.path.append(ROOT+'model_scripts/')
 sys.path.append(ROOT+'tools/')
 
 from data_tools import ELEDataset
+from eda_tools import  gen_eda_data
 from clozeTest_model import ClozeTestModel
 from baseline_model import BaseLineModel
 from preprocess import Preprocessor, Sample
@@ -38,7 +39,11 @@ def gen_dataloaders(args):
 	elif 'bert' in args.pretrained_model:
 		model_name = 'bert'
 
-	data_collections = ['train', 'dev', 'test']
+	# gen eda data if need to use and not already done
+	if bool(args.use_eda_data) and not os.path.exists(ROOT+"/data/pt/train_eda-{}.pt".format(model_name)) and not os.path.exists(ROOT+"/data/raw/train_eda/"):
+		gen_eda_data(ROOT+"/data/raw/train")
+	# preprocess data if not already done
+	data_collections = ['train' if not bool(args.use_eda_data) else 'train_eda', 'dev', 'test']
 	for each in data_collections:
 		args.data_dir = ROOT+'/data/raw/{}'.format(each)
 		args.out_path = ROOT+'/data/pt/{}-{}.pt'.format(each, model_name)
@@ -49,28 +54,22 @@ def gen_dataloaders(args):
 			preprocessor.save(samples)
 	  
 	# load data and return DataLoader
-	# train, val, test dataset
-	train_dataset = ELEDataset(ROOT+'/data/pt/{}-{}.pt'.format('train', model_name), bool(args.debug))
-	nb_train_samples = int(len(train_dataset)*0.9)
-	nb_val_samples = len(train_dataset)-nb_train_samples
-	train_dataset, val_dataset = random_split(train_dataset, [nb_train_samples, nb_val_samples])
+	# train, test dataset
+	train_dataset = ELEDataset(ROOT+'/data/pt/{}-{}.pt'.format('train' if not bool(args.use_eda_data) else 'train_eda', model_name), bool(args.debug))
 	test_dataset = ELEDataset(ROOT+'/data/pt/{}-{}.pt'.format('dev', model_name), bool(args.debug))
 	if args.local_rank == 0:
-		args.LOGGER.logging("debug mode:{} train samples:{}  val samples:{}  test samples:{}".format(bool(args.debug), len(train_dataset), len(val_dataset),len(test_dataset)))
+		args.LOGGER.logging("debug mode:{} train samples:{}  test samples:{}".format(bool(args.debug), len(train_dataset),len(test_dataset)))
 	# train, val, test data loaders
 	if args.ngpu>1 and dist.is_available():
 		train_sampler = DistributedSampler(train_dataset)
-		val_sampler = DistributedSampler(val_dataset)
 		test_sampler = DistributedSampler(test_dataset)
 	else:
 		train_sampler = None
-		val_sampler = None
 		test_sampler= None
 	train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.ncpu, sampler=train_sampler)
-	val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.ncpu, sampler=val_sampler)
 	test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.ncpu, sampler=test_sampler)
  
-	return train_loader, val_loader, test_loader, nb_train_samples
+	return train_loader, test_loader, len(train_dataset)
 
 class Logger(object):
 	def __init__(self, log_path):
@@ -196,12 +195,12 @@ def train(args):
 	
 	return epoch_loss
 
-def validation_test(args, mode = 'val'):
+def validation_test(args):
 	args.MODEL.eval()
 	val_loss = []
 	val_acc_num = 0
 	val_que_num = 0
-	dataloader = args.VAL_LOADER if mode=='val' else args.TEST_LOADER
+	dataloader = args.TEST_LOADER
 	with torch.no_grad():
 		for data_batch in dataloader:
 			article, option, answer, article_mask, option_mask, mask, blank_pos, sample_name = data_batch
@@ -233,12 +232,8 @@ def validation_test(args, mode = 'val'):
 	avg_loss = torch.mean(torch.Tensor(val_loss)).item()
 	accuracy = val_acc_num/val_que_num*100
 	if args.local_rank == 0:
-		if mode == 'val':
-			args.LOGGER.logging("epoch[{}] val_loss={:.5f} val_accuracy={:.4f}%".format(args.current_epoch, avg_loss, accuracy))
-			args.LOGGER.logging("epoch[{}] validation complete.".format(args.current_epoch))
-		else:
-			args.LOGGER.logging("test_loss={:.5f} test_accuracy={:.4f}%".format(avg_loss, accuracy))
-			args.LOGGER.logging("test complete.")
+		args.LOGGER.logging("epoch[{}] val_loss={:.5f} val_accuracy={:.4f}%".format(args.current_epoch, avg_loss, accuracy))
+		args.LOGGER.logging("epoch[{}] validation complete.".format(args.current_epoch))
 	return avg_loss, accuracy.item()
 	
 def main(args):
@@ -268,7 +263,7 @@ def main(args):
 	
 	# get data loaders
 	args.LOGGER.logging("local rank[{}]:preprocessing data and getting data loaders...".format(args.local_rank))
-	args.TRAIN_LOADER, args.VAL_LOADER, args.TEST_LOADER, nb_train_samples = gen_dataloaders(args)
+	args.TRAIN_LOADER, args.TEST_LOADER, nb_train_samples = gen_dataloaders(args)
 	
 	# model
 	args.LOGGER.logging("local rank[{}]:preparing model and initialize weights...".format(args.local_rank))
@@ -327,7 +322,7 @@ def main(args):
 		train_loss = train(args) # train
 		if args.local_rank == 0:
 			args.LOGGER.logging("VALIDATING...")
-		val_loss, accuracy = validation_test(args, mode='val') # validation
+		val_loss, accuracy = validation_test(args) # validation
 		
 		state['train_loss']+=train_loss
 		state['val_loss'].append(val_loss)
@@ -345,11 +340,8 @@ def main(args):
 	if args.local_rank==0:
 		args.LOGGER.logging("TRAIN AND VALIDATION COMPLETE.")
 
-	# test
-	if args.local_rank == 0:
-		args.LOGGER.logging("TESTING...")
-	_, accuracy = validation_test(args, mode='test')
-	state['test_accuracy'] = accuracy
+	# save test accuracy
+	state['test_accuracy'] = state['val_accuracy'][-1]
 
 	# save state dict
 	if args.local_rank == 0:
@@ -367,7 +359,11 @@ def main(args):
 			state_dict = args.MODEL.module.state_dict() if bool(args.fp16) else args.MODEL.state_dict()
 			torch.save(state_dict, f)
 		args.LOGGER.logging("all tasks complete.")
-	sys.exit()
+	
+	# empty gpu cache so that the program can exit properly
+	#args.MODEL.to('cpu')
+	#torch.cuda.empty_cache()
+	dist.destroy_process_group()
 
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
@@ -383,6 +379,7 @@ if __name__ == '__main__':
 	parser.add_argument("--local_rank", type=int, default=-1, help='local rank of device, do not change.')
 	parser.add_argument("--debug", type=int, default=0, help='1 to set the debug mode to run a fast test if there is any problem in the program, 0 to disable debug.')
 	parser.add_argument("--use_baseline", type=int, default=1, help='1 to use baseline model and 0 to use advanced model, in this version we only use baseline model.')
+	parser.add_argument("--use_eda_data", type=int, default=0, help='1 to use extra eda data, 0 to not.')
 	args = parser.parse_args()
 	args.ngpu = torch.cuda.device_count()
 	args.ncpu = cpu_count()
@@ -392,4 +389,3 @@ if __name__ == '__main__':
 	os.makedirs(args.log_ckpt_dir, exist_ok=True)
 	# main
 	main(args)
-	sys.exit()

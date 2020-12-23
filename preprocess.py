@@ -8,7 +8,7 @@ import time
 
 import numpy as np
 import torch
-import json
+import json, re
 import argparse
 import random
 import multiprocessing as mul
@@ -22,6 +22,26 @@ finally:
     from transformers import BertTokenizer, AlbertTokenizer,RobertaTokenizer,XLNetTokenizer
 
 torch.multiprocessing.set_sharing_strategy('file_system')
+
+def clean_words(word_in):
+
+    word_out = ""
+    
+    word_in = word_in.replace("-", " ") #replace hyphens with spaces
+    word_in = word_in.replace("\t", " ")
+    word_in = word_in.replace("\n", " ")
+    word_in = word_in.lower()
+
+    for char in word_in:
+        if char in 'qwertyuiopasdfghjklzxcvbnm_:.,!?\'\" ':
+            word_out += char
+        else:
+            word_out += ' '
+
+    word_out = re.sub(' +',' ',word_out) #delete extra spaces
+    if word_out[0] == ' ':
+        word_out = word_out[1:]
+    return word_out
 
 class Sample(object):
     def __init__(self, sample_name):
@@ -127,7 +147,7 @@ class Preprocessor(object):
             #print("process {}: createing sample for {}".format(os.getpid() ,fname))
 
             # tokenze article
-            article = raw_data['article'].replace('_', self.mask_token)
+            article = clean_words(raw_data['article']).replace('_', self.mask_token)
             article = self.tokenizer.tokenize(article)
 
             # separate article if needed
@@ -191,8 +211,10 @@ class Preprocessor(object):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--pretrained_model", type=str, default='albert-base-v2')
+    parser.add_argument("--ncpu", type=int, default=0)
     args = parser.parse_args()
-    args.ncpu = mul.cpu_count()
+    if args.ncpu == 0:
+        args.ncpu = mul.cpu_count()
     
     if 'albert' in args.pretrained_model:
         model_name = 'albert'
@@ -203,9 +225,10 @@ if __name__ == "__main__":
     elif 'bert' in args.pretrained_model:
         model_name = 'bert'
 
-    data_collections = ['train', 'dev', 'test']
+    data_collections = ['train', 'dev', 'test', 'train_eda']
     for each in data_collections:
         args.data_dir = ROOT+'/data/raw/{}'.format(each)
+        assert os.path.exists(args.data_dir), "data directory does not exist."
         args.out_path = ROOT+'/data/pt/{}-{}.pt'.format(each, model_name)
         start = time.time()
         if not os.path.exists(args.out_path):
